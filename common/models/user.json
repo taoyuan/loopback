@@ -35,6 +35,9 @@
     "created": "date",
     "lastUpdated": "date"
   },
+  "options": {
+    "caseSensitiveEmail": true
+  },
   "hidden": ["password"],
   "acls": [
     {

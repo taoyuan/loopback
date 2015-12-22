@@ -39,14 +39,18 @@ var debug = require('debug')('loopback:user');
  * - ALLOW OWNER `deleteById`
  * - ALLOW EVERYONE `login`
  * - ALLOW EVERYONE `logout`
- * - ALLOW EVERYONE `findById`
+ * - ALLOW OWNER `findById`
  * - ALLOW OWNER `updateAttributes`
  *
- * @property {String} username Must be unique
- * @property {String} password Hidden from remote clients
- * @property {String} email Must be valid email
- * @property {Boolean} emailVerified Set when a user's email has been verified via `confirm()`
- * @property {String} verificationToken Set when `verify()` is called
+ * @property {String} username Must be unique.
+ * @property {String} password Hidden from remote clients.
+ * @property {String} email Must be valid email.
+ * @property {Boolean} emailVerified Set when a user's email has been verified via `confirm()`.
+ * @property {String} verificationToken Set when `verify()` is called.
+ * @property {String} realm The namespace the user belongs to. See [Partitioning users with realms](https://docs.strongloop.com/display/public/LB/Partitioning+users+with+realms) for details.
+ * @property {Date} created The property is not used by LoopBack, you are free to use it for your own purposes.
+ * @property {Date} lastUpdated The property is not used by LoopBack, you are free to use it for your own purposes.
+ * @property {String} status The property is not used by LoopBack, you are free to use it for your own purposes.
  * @property {Object} settings Extends the `Model.settings` object.
  * @property {Boolean} settings.emailVerificationRequired Require the email verification
  * process before allowing a login.
@@ -58,6 +62,7 @@ var debug = require('debug')('loopback:user');
  * @property {String} settings.realmDelimiter When set a realm is required.
  * @property {Number} settings.resetPasswordTokenTTL Time to live for password reset `AccessToken`. Default is `900` (15 minutes).
  * @property {Number} settings.saltWorkFactor The `bcrypt` salt work factor. Default is `10`.
+ * @property {Boolean} settings.caseSensitiveEmail Enable case sensitive email.
  *
  * @class User
  * @inherits {PersistedModel}
@@ -355,7 +360,7 @@ module.exports = function(User) {
     assert(options.type, 'You must supply a verification type (options.type)');
     assert(options.type === 'email', 'Unsupported verification type');
     assert(options.to || this.email, 'Must include options.to when calling user.verify() or the user must have an email property');
-    assert(options.from, 'Must include options.from when calling user.verify() or the user must have an email property');
+    assert(options.from, 'Must include options.from when calling user.verify()');
 
     options.redirect = options.redirect || '/';
     options.template = path.resolve(options.template || path.join(__dirname, '..', '..', 'templates', 'verify.ejs'));
@@ -366,12 +371,17 @@ module.exports = function(User) {
     options.host = options.host || (app && app.get('host')) || 'localhost';
     options.port = options.port || (app && app.get('port')) || 3000;
     options.restApiRoot = options.restApiRoot || (app && app.get('restApiRoot')) || '/api';
+
+    var displayPort = (
+      (options.protocol === 'http' && options.port == '80') ||
+      (options.protocol === 'https' && options.port == '443')
+    ) ? '' : ':' + options.port;
+
     options.verifyHref = options.verifyHref ||
       options.protocol +
       '://' +
       options.host +
-      ':' +
-      options.port +
+      displayPort +
       options.restApiRoot +
       userModel.http.path +
       userModel.sharedClass.find('confirm', true).http.path +
@@ -501,35 +511,39 @@ module.exports = function(User) {
     var ttl = UserModel.settings.resetPasswordTokenTTL || DEFAULT_RESET_PW_TTL;
 
     options = options || {};
-    if (typeof options.email === 'string') {
-      UserModel.findOne({ where: {email: options.email} }, function(err, user) {
-        if (err) {
-          cb(err);
-        } else if (user) {
-          // create a short lived access token for temp login to change password
-          // TODO(ritch) - eventually this should only allow password change
-          user.accessTokens.create({ttl: ttl}, function(err, accessToken) {
-            if (err) {
-              cb(err);
-            } else {
-              cb();
-              UserModel.emit('resetPasswordRequest', {
-                email: options.email,
-                accessToken: accessToken,
-                user: user
-              });
-            }
-          });
-        } else {
-          cb();
-        }
-      });
-    } else {
-      var err = new Error('email is required');
+    if (typeof options.email !== 'string') {
+      var err = new Error('Email is required');
       err.statusCode = 400;
       err.code = 'EMAIL_REQUIRED';
       cb(err);
+      return cb.promise;
     }
+
+    UserModel.findOne({ where: {email: options.email} }, function(err, user) {
+      if (err) {
+        return cb(err);
+      }
+      if (!user) {
+        err = new Error('Email not found');
+        err.statusCode = 404;
+        err.code = 'EMAIL_NOT_FOUND';
+        return cb(err);
+      }
+      // create a short lived access token for temp login to change password
+      // TODO(ritch) - eventually this should only allow password change
+      user.accessTokens.create({ttl: ttl}, function(err, accessToken) {
+        if (err) {
+          return cb(err);
+        }
+        cb();
+        UserModel.emit('resetPasswordRequest', {
+          email: options.email,
+          accessToken: accessToken,
+          user: user
+        });
+      });
+    });
+
     return cb.promise;
   };
 
@@ -564,6 +578,14 @@ module.exports = function(User) {
     this.settings.maxTTL = this.settings.maxTTL || DEFAULT_MAX_TTL;
     this.settings.ttl = this.settings.ttl || DEFAULT_TTL;
 
+    UserModel.setter.email = function(value) {
+      if (!UserModel.settings.caseSensitiveEmail) {
+        this.$email = value.toLowerCase();
+      } else {
+        this.$email = value;
+      }
+    };
+
     UserModel.setter.password = function(plain) {
       if (typeof plain !== 'string') {
         return;
@@ -576,6 +598,14 @@ module.exports = function(User) {
         this.$password = this.constructor.hashPassword(plain);
       }
     };
+
+    // Access token to normalize email credentials
+    UserModel.observe('access', function normalizeEmailCase(ctx, next) {
+      if (!ctx.Model.settings.caseSensitiveEmail && ctx.query.where && ctx.query.where.email) {
+        ctx.query.where.email = ctx.query.where.email.toLowerCase();
+      }
+      next();
+    });
 
     // Make sure emailVerified is not set by creation
     UserModel.beforeRemote('create', function(ctx, user, next) {

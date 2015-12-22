@@ -1,3 +1,93 @@
+2015-12-17, Version 2.26.1
+==========================
+
+ * PersistedModel: log rectify/rectifyAll triggers (Miroslav Bajtoš)
+
+
+2015-12-09, Version 2.26.0
+==========================
+
+ * change: skip cp lookup on no change (Miroslav Bajtoš)
+
+ * Change: correctly rectify no-change (Miroslav Bajtoš)
+
+ * Update model.js (Rand McKinney)
+
+ * Adding properties description for User Model (David Cheung)
+
+ * Add case-sensitve email option for User model. (Richard Pringle)
+
+
+2015-11-13, Version 2.25.0
+==========================
+
+ * Fix typo in description of persistedModel.updateAttributes() (Richard Pringle)
+
+
+2015-11-09, Version 2.24.0
+==========================
+
+ * Fix cookie-parser error (Simon Ho)
+
+
+2015-11-09, Version 2.23.0
+==========================
+
+ * lib/registry: fix findModel for model ctor (Miroslav Bajtoš)
+
+ * Refer to licenses with a link (Sam Roberts)
+
+ * Fix user.resetPassword to fail on email not found (Simo Moujami)
+
+ * Fix typo in doc comment (Rand McKinney)
+
+ * Do not include redundant ports in verify links (Samuel Gaus)
+
+ * Set application's id property only if it's empty. (wusuopu)
+
+ * Check configs for shared method settings (Simon Ho)
+
+ * Add test fixtures for shared methods (Simon Ho)
+
+ * Clean up .jshintrc (Simon Ho)
+
+ * Update comment about user ACL to reflect implementation (Felipe Oliveira Carvalho)
+
+
+2015-09-23, Version 2.22.2
+==========================
+
+ * Use strongloop conventions for licensing (Sam Roberts)
+
+ * Set package license to MIT (Sam Roberts)
+
+
+2015-09-18, Version 2.22.1
+==========================
+
+ * Fix perf of rectification after updateAttributes (Miroslav Bajtoš)
+
+ * Update persisted-model.js (Rand McKinney)
+
+ * Stop NPM license warning (Simon Ho)
+
+
+2015-09-03, Version 2.22.0
+==========================
+
+ * Create stack-removing errorhandler middleware (Richard Walker)
+
+ * Update README.md (Rand McKinney)
+
+ * Allow EJS templates to use includes (Samuel Gaus)
+
+ * Fix options.to assertion message in user.verify (Farid Nouri Neshat)
+
+ * Upgrade Travis to container-based infrastructure (Miroslav Bajtoš)
+
+ * fix typo "PeristedModel" (Christoph)
+
+
 2015-08-13, Version 2.21.0
 ==========================
 
